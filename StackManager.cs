@@ -4,15 +4,11 @@ using UnityEngine;
 
 public class StackManager : MonoBehaviour
 {
-    // Start is called before the first frame update
+    private GameObject[] stacks;
+    
     void Start()
     {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
+        for (int i = 0; i < transform.childCount; i++)
+            stacks[i] = transform.GetChild(i).gameObject;
     }
 }
