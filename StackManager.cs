@@ -5,8 +5,8 @@ using UnityEngine;
 public class StackManager : MonoBehaviour
 {
     private GameObject[] stacks;
-    
-    void Start()
+
+    private void Start()
     {
         for (int i = 0; i < transform.childCount; i++)
             stacks[i] = transform.GetChild(i).gameObject;
