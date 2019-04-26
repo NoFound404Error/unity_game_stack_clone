@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
-using UnityEngine.EventSystems;
 
 public class StackManager : MonoBehaviour
 {
@@ -26,22 +25,22 @@ public class StackManager : MonoBehaviour
     private int combo = 0;          // 콤보( 4연 콤보부터 스택 사이즈 늘어남)
 
     private float tileTransition = 0.0f;        // 블럭 위치 변화
-    private float tileSpeed = 2.5f;             // 블럭 이동 속도
+    private float tileSpeed = 4.5f;             // 블럭 이동 속도
     private float secondaryPosition;            // 움직일 위치
 
     private Vector3 desiredPosition;            // 스택이 움직일 위치
     private Vector3 lastTilePosition;           // 이전 블럭 위치
     
-    private Vector3 moveStartX;
-    private Vector3 moveEndX;
-    private Vector3 moveStartZ;
-    private Vector3 moveEndZ;
-    private Vector3 nextPosition;
-    [SerializeField]
-    private Transform transformB;
+    private Vector3 preXPosition;           // X축 블럭 시작점
+    private Vector3 nextXPosition;          // X축 블럭 도착점
+    private Vector3 preZPosition;           // Z축 블럭 시작점
+    private Vector3 nextZPosition;          // Z축 블럭 도착점
 
     private bool isMoveOnX = true;      // X축 OR Z축 방향    
-    private bool isDead = false;        
+    private bool isDead = false;
+
+    int pos = 0;
+    //int height = 0;
 
     private void Start()
     {
@@ -53,9 +52,10 @@ public class StackManager : MonoBehaviour
         }
 
         stackIndex = transform.childCount - 1;
-
-        moveStartX = transform.localPosition;
-        nextPosition = moveEndX;
+        preXPosition = new Vector3(3.5f, 0f, 0f);
+        nextXPosition = new Vector3(-3.5f, 0f, 0f);
+        preZPosition = new Vector3(0f, 0f, 3.5f);
+        nextZPosition = new Vector3(0f, 0f, -3.5f);
     }    
 
     private void Update()
@@ -63,7 +63,7 @@ public class StackManager : MonoBehaviour
         if (isDead)
             return;
 
-        MoveTile();
+        MoveConstantly();
 
         transform.position = Vector3.Lerp(transform.position, desiredPosition, STACK_MOVING_SPEED * Time.deltaTime);    // 전체 스택의 위치 조정
         
@@ -73,8 +73,8 @@ public class StackManager : MonoBehaviour
     {
         if (PlaceIt())
         {
-            SpawnTile();
             scoreCount++;
+            SpawnTile();
             scoreText.text = scoreCount.ToString();
         }
         else
@@ -83,7 +83,7 @@ public class StackManager : MonoBehaviour
         }
     }
 
-    private void CreateRubble(Vector3 pos, Vector3 sca)
+    private void CreateRubble(Vector3 pos, Vector3 sca)     // 블럭의 잘리는 부분을 생성
     {
         GameObject go = GameObject.CreatePrimitive(PrimitiveType.Cube);
 
@@ -97,22 +97,55 @@ public class StackManager : MonoBehaviour
         Destroy(go, 5f);
     }
 
-    private void MoveTile()
-    {
-        tileTransition += Time.deltaTime * tileSpeed;
-        if (isMoveOnX)
-            theStack[stackIndex].transform.localPosition = new Vector3(Mathf.Sin(tileTransition) * BOUND_SIZE, scoreCount, secondaryPosition);
-        else
-            theStack[stackIndex].transform.localPosition = new Vector3(secondaryPosition, scoreCount, Mathf.Sin(tileTransition) * BOUND_SIZE);
-    }
-
     private void MoveConstantly()
     {
-        theStack[stackIndex].transform.localPosition = Vector3.MoveTowards(transform.position, nextPosition, Time.deltaTime * tileSpeed);
+        tileTransition += Time.deltaTime * tileSpeed;
+        
+        switch(pos)
+        {
+            case 0:
+                theStack[stackIndex].transform.position = new Vector3(preXPosition.x - tileTransition, 0, 0);
+                break;
+            case 1:
+                theStack[stackIndex].transform.position = new Vector3(preXPosition.x + tileTransition, 0, 0);
+                break;
+            case 2:
+                theStack[stackIndex].transform.position = new Vector3(0, 0, preZPosition.z - tileTransition);
+                break;
+            case 3:
+                theStack[stackIndex].transform.position = new Vector3(0, 0, preZPosition.z + tileTransition);
+                break;
+        }
+        if (Vector3.SqrMagnitude(theStack[stackIndex].transform.position - nextXPosition) <= 0.01 || Vector3.SqrMagnitude(theStack[stackIndex].transform.position - nextZPosition) <= 0.01)  
+        {
+            ChangeDestination();
+            if (isMoveOnX)
+                pos = pos == 0 ? 1 : 0;
+            else
+                pos = pos == 2 ? 3 : 2;
+        }
+    }
+
+    private void ChangeDestination()
+    {
+        if (isMoveOnX)
+        {
+            tileTransition = 0;
+            preXPosition = nextXPosition;
+            nextXPosition = nextXPosition == preXPosition ? nextXPosition : preXPosition;
+            print(nextXPosition);
+        }
+        else
+        {
+            tileTransition = 0;
+            preZPosition = nextZPosition;
+            nextZPosition = nextZPosition != preZPosition ? preZPosition : nextZPosition;
+        }
     }
 
     private void SpawnTile()
     {
+        tileTransition = 0;
         lastTilePosition = theStack[stackIndex].transform.localPosition;
 
         stackIndex--;
@@ -122,8 +155,18 @@ public class StackManager : MonoBehaviour
         }
 
         desiredPosition = (Vector3.down) * scoreCount;
-
-        theStack[stackIndex].transform.localPosition = new Vector3(0, scoreCount, 0);
+        // 새로운 블럭의 위치
+        if (isMoveOnX)
+        {
+            preXPosition = new Vector3(3.5f, scoreCount, 0);
+            theStack[stackIndex].transform.localPosition = new Vector3(3.5f, 0, 0);
+        }
+        else
+        {
+            preZPosition = new Vector3(0, scoreCount, 3.5f);
+            theStack[stackIndex].transform.localPosition = new Vector3(0, 0, 3.5f);
+        }
+        // 새 블럭의 크기
         theStack[stackIndex].transform.localScale = new Vector3(stackBound.x, 1, stackBound.y);
 
         ColorMesh(theStack[stackIndex].GetComponent<MeshFilter>().mesh);
@@ -132,8 +175,9 @@ public class StackManager : MonoBehaviour
     private bool PlaceIt()
     {
         Transform t = theStack[stackIndex].transform;
-        var parCount = comboParticle.emission;
+        var parCount = comboParticle.emission;          // 콤보 이펙트
 
+        // 블럭위치에 따라 잔해를 생성하거나 콤보이펙트가 생기거나
         if (isMoveOnX)
         {
             float deltaX = lastTilePosition.x - t.position.x;
@@ -166,6 +210,7 @@ public class StackManager : MonoBehaviour
                 if (combo > 3)
                 {
                     stackBound.x += 0.25f;
+                    
                     float middle = lastTilePosition.x + t.localPosition.x / 2;
                     t.localScale = new Vector3(stackBound.x, 1, stackBound.y);
                     t.localPosition = new Vector3(middle - (lastTilePosition.x / 2), scoreCount, lastTilePosition.z);
@@ -217,6 +262,12 @@ public class StackManager : MonoBehaviour
 
         secondaryPosition = (isMoveOnX) ? t.localPosition.x : t.localPosition.z;
 
+        // 진행 방향 바꾸기
+        if (pos == 0 || pos == 1)
+            pos = 2;
+        else
+            pos = 0;
+
         isMoveOnX = !isMoveOnX;
 
         return true;
@@ -228,11 +279,10 @@ public class StackManager : MonoBehaviour
         {
             PlayerPrefs.SetInt("score", scoreCount);
         }
+
         isDead = true;
         clickPanel.SetActive(false);
         endPanel.SetActive(true);
-        
-        //theStack[stackIndex].AddComponent<Rigidbody>();
     }
 
     public void SceneChange(string sceneName)
