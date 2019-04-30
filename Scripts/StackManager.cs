@@ -12,6 +12,7 @@ public class StackManager : MonoBehaviour
     public GameObject endPanel;                         // 게임 오버 판넬
     public GameObject clickPanel;                       // 터치를 위한 판넬 
     public ParticleSystem comboParticle;
+    public AudioSource tapAudio;
 
     private const float BOUND_SIZE = 3.5f;                              // 블럭 사이즈
     private const float STACK_MOVING_SPEED = 5.0f;                      // 스택 이동 속도
@@ -35,6 +36,7 @@ public class StackManager : MonoBehaviour
     private Vector3 nextXPosition;          // X축 블럭 도착점
     private Vector3 preZPosition;           // Z축 블럭 시작점
     private Vector3 nextZPosition;          // Z축 블럭 도착점
+    private Vector3 tempPosition;
 
     private bool isMoveOnX = true;      // X축 OR Z축 방향    
     private bool isDead = false;
@@ -66,13 +68,13 @@ public class StackManager : MonoBehaviour
         MoveConstantly();
 
         transform.position = Vector3.Lerp(transform.position, desiredPosition, STACK_MOVING_SPEED * Time.deltaTime);    // 전체 스택의 위치 조정
-        
     }
 
     public void PlaceTile()
     {
         if (PlaceIt())
         {
+            tapAudio.Play();
             scoreCount++;
             SpawnTile();
             scoreText.text = scoreCount.ToString();
@@ -104,16 +106,16 @@ public class StackManager : MonoBehaviour
         switch(pos)
         {
             case 0:
-                theStack[stackIndex].transform.position = new Vector3(preXPosition.x - tileTransition, 0, 0);
+                theStack[stackIndex].transform.position = preXPosition + new Vector3(-tileTransition, 0, 0);
                 break;
             case 1:
-                theStack[stackIndex].transform.position = new Vector3(preXPosition.x + tileTransition, 0, 0);
+                theStack[stackIndex].transform.position = preXPosition + new Vector3(tileTransition, 0, 0);
                 break;
             case 2:
-                theStack[stackIndex].transform.position = new Vector3(0, 0, preZPosition.z - tileTransition);
+                theStack[stackIndex].transform.position = preZPosition + new Vector3(0, 0, -tileTransition);
                 break;
             case 3:
-                theStack[stackIndex].transform.position = new Vector3(0, 0, preZPosition.z + tileTransition);
+                theStack[stackIndex].transform.position = preZPosition + new Vector3(0, 0, tileTransition);
                 break;
         }
         if (Vector3.SqrMagnitude(theStack[stackIndex].transform.position - nextXPosition) <= 0.01 || Vector3.SqrMagnitude(theStack[stackIndex].transform.position - nextZPosition) <= 0.01)  
@@ -131,15 +133,16 @@ public class StackManager : MonoBehaviour
         if (isMoveOnX)
         {
             tileTransition = 0;
+            tempPosition = preXPosition;
             preXPosition = nextXPosition;
-            nextXPosition = nextXPosition == preXPosition ? nextXPosition : preXPosition;
-            print(nextXPosition);
+            nextXPosition = tempPosition;
         }
         else
         {
             tileTransition = 0;
+            tempPosition = preZPosition;
             preZPosition = nextZPosition;
-            nextZPosition = nextZPosition != preZPosition ? preZPosition : nextZPosition;
+            nextZPosition = tempPosition;
         }
     }
 
@@ -158,13 +161,16 @@ public class StackManager : MonoBehaviour
         // 새로운 블럭의 위치
         if (isMoveOnX)
         {
-            preXPosition = new Vector3(3.5f, scoreCount, 0);
-            theStack[stackIndex].transform.localPosition = new Vector3(3.5f, 0, 0);
+            theStack[stackIndex].transform.localPosition = new Vector3(3.5f, 0f, preXPosition.z/2);
+            preXPosition.x = 3.5f;
+            
+            print(preXPosition);
         }
         else
         {
-            preZPosition = new Vector3(0, scoreCount, 3.5f);
-            theStack[stackIndex].transform.localPosition = new Vector3(0, 0, 3.5f);
+            theStack[stackIndex].transform.localPosition = new Vector3(preZPosition.x/2 , 0f, 3.5f);
+            preZPosition.z = 3.5f;
+            print(preZPosition);
         }
         // 새 블럭의 크기
         theStack[stackIndex].transform.localScale = new Vector3(stackBound.x, 1, stackBound.y);
@@ -192,9 +198,13 @@ public class StackManager : MonoBehaviour
 
                 float middle = lastTilePosition.x + t.localPosition.x / 2;
                 t.localScale = new Vector3(stackBound.x, 1, stackBound.y);
+
+                preZPosition -= new Vector3(deltaX/2, 0f, 0f);
+                nextZPosition -= new Vector3(deltaX/2, 0f, 0f);
+
                 CreateRubble(
                     new Vector3((t.position.x > 0)
-                        ? t.position.x + (t.localScale.x / 2)
+                        ? t.position.x + (t.localScale.x / 2) 
                         : t.position.x - (t.localScale.x / 2)
                         , t.position.y, t.position.z),
                     new Vector3(Mathf.Abs(deltaX), 1, t.localScale.z));
@@ -233,6 +243,9 @@ public class StackManager : MonoBehaviour
 
                 float middle = lastTilePosition.z + t.localPosition.z / 2;
                 t.localScale = new Vector3(stackBound.x, 1, stackBound.y);
+                preXPosition -= new Vector3(0f, 0f, deltaZ / 2);
+                nextXPosition -= new Vector3(0f, 0f, deltaZ / 2);
+
                 CreateRubble(
                     new Vector3(t.position.x, t.position.y,
                         (t.position.z > 0)
